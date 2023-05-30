@@ -73,9 +73,10 @@ class MotorDriver{
 };
 
 SimpleCommand cmd;
-SimplePID control;
+SimplePID control_pos;
+SimplePID control_vel;
 
-float setpoint = 0;
+float setpoint = 0, setpoint_vel=0;
 long last_count = 0;
 bool pos_print = true;
 float w = 0, last_pos=0;
@@ -83,7 +84,7 @@ unsigned long last_t = 0;
 volatile float t_incr =0; 
 
                 //in,in,pwm,a,b
-MotorDriver motor(4,5,6,2,3);
+MotorDriver motor(4,5,6,2,A3);
 
 void encoder_irs(){
   (digitalRead(motor.pin_B))? motor.steps_encoder++ : motor.steps_encoder--;
@@ -103,9 +104,10 @@ void commands_config(){
   cmd.enable_echo(true);
   
   cmd.addCommand("list",list);
-  cmd.addCommand("p",&control.kp);
-  cmd.addCommand("i",&control.ki);
-  cmd.addCommand("d",&control.kd);
+  cmd.addCommand("p",&control_vel.kp);
+  cmd.addCommand("i",&control_vel.ki);
+  cmd.addCommand("d",&control_vel.kd);
+  cmd.addCommand("sw",&setpoint_vel);
   cmd.addCommand("s",&setpoint);
   cmd.addCommand("t",print_pos);
   Serial.begin(115200);
@@ -113,10 +115,16 @@ void commands_config(){
 }
 
 void control_config(){
-  control.setGains(2.0,0,0.22);
-  control.setIntegralLimits(80);
-  control.setOutLimits(255);
-  control.begin(MICROISECONDS, 5000);
+  //control.setGains(2.0,0,0.22); //para el control de posicion
+  control_vel.setGains(3.0,2.0,0.005); //para el control de velocidad
+  control_vel.setIntegralLimits(255);
+  control_vel.setOutLimits(255);
+  control_vel.begin(MICROISECONDS, 5000);
+
+  control_pos.setGains(2.0,0,0);
+  control_pos.setIntegralLimits(100);
+  control_pos.setOutLimits(540);
+  control_pos.begin(MICROISECONDS,10000);
 }
 
 void setup() {
@@ -128,8 +136,13 @@ void setup() {
 }
 
 void loop() {
-  float error = setpoint - motor.theta(DEGREES);
-  int pwm_out = control.calulate_out(error);
+  //float error = setpoint - motor.theta(DEGREES);
+  
+  float error = setpoint_vel - w;//motor.theta(DEGREES);
+  //float error_vel = control_pos.calulate_out(error) - w;
+  //control_vel.setOutLimits(setpoint_vel);
+  //int pwm_out = control_vel.calulate_out(error_vel);
+  int pwm_out = control_vel.calulate_out(error);
   motor.motor_move(pwm_out);
 
   if(motor.steps_encoder != last_count && pos_print){
@@ -139,9 +152,9 @@ void loop() {
     w = (tmp1-last_pos)/t_incr;
     last_pos = tmp1;
 
-    Serial.print(last_count);
-    Serial.print("\t");
-    Serial.println(w,3);
+    //Serial.print(last_count);
+    //Serial.print("\t");
+    //Serial.println(w,3);
   }
   cmd.listen();
 }
