@@ -4,8 +4,6 @@
 #include <Distance_sensor_config.h>
 #include <CAN_protocol_config.h>
 
-
-
 SimpleCommand cmd;
 
 void list(){
@@ -32,7 +30,7 @@ void setup() {
   sensor_update();
   Serial.println("sensor listo");
 
-  can_protocol_config();
+  can_protocol_config(&Serial);
 }
 
 
@@ -40,5 +38,8 @@ void loop() {
   cmd.listen();
   ligths_update();
   sensor_update();
-  can_listen(Serial, distance);
+  //can_listen(Serial, distance);
+  //can_read_LevelSeed_request(distance);
+  //can_find_module();
+  can_listen(&Serial,distance);
 }

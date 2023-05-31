@@ -14,8 +14,7 @@ void sensor_config(){
   ss_port.begin(9600);
 }
 
-void 
-sensor_update(){
+void sensor_update(){
   //bool corret_data = false;
   //while(!corret_data){
     if(ss_port.available()){

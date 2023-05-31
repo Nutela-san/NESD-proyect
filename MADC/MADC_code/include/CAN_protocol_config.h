@@ -3,29 +3,25 @@
 #include <mcp2515.h>
 
 //----- Data type -----
-enum NESD_conection{
+enum NESD_responses{
   no_msj,
   other_mjs,
   ok_mjs
 };
 
-enum device_type{
+enum NESD_device_type{
   MASTER_MADC,
-  SLAVE_MMNS,
-  SLAVE_MEO,
-  SLAVE_MED
+  SLAVE_MMNS1,
+  SLAVE_MMNS2,
+  SLAVE_MMNS3,
+  SLAVE_MEO1,
+  SLAVE_MEO2,
+  SLAVE_MED1,
+  SLAVE_MED2,
+  SLAVE_MED3
 };
 
-struct NESD_Device {
-  uint8_t ID;
-  device_type module_type;
-};
-
-const unsigned long timeout = 500UL;
-
-uint8_t device_cout = 0;
-
-NESD_Device *device_list;
+ulong timeout = 500;
 
 //----- Frames para Mensajes -----
 struct can_frame msg_request;
@@ -60,6 +56,156 @@ enum NESD_commands{
 const uint8_t chip_selec_can = 5;
 MCP2515 can_port(chip_selec_can);
 
+void can_protocol_config(Stream *port){ //Configuracion de módulo
+  
+  pinMode(chip_selec_can,OUTPUT);
+
+  while(can_port.reset() != MCP2515::ERROR_OK) {
+    port->println("error can - conetion");
+    delay(1000);
+  }
+  
+  while( can_port.setBitrate(CAN_125KBPS, MCP_8MHZ) != MCP2515::ERROR_OK){
+    port->println("error can - speed config");
+    delay(1000);
+  }
+
+  while( can_port.setNormalMode() != MCP2515::ERROR_OK){
+    port->println("error can - mode");
+    delay(1000);
+  }
+
+  port->println("CAN ready!");
+
+}
+
+//----- Checks of Conection -----
+void can_test_conection_MMNSs(Stream *port){
+  for(uint8_t i = 0; i<3; i++){
+    msg_request.can_id = ID_MMNS[i]; 
+    msg_request.can_dlc =1;
+    msg_request.data[0] = NESD_commands::request_conection;
+
+    can_port.sendMessage(&msg_request);
+    bool recived_mgs = false;
+    ulong last_t = millis();
+    while(!recived_mgs && (millis()-last_t)<= timeout){
+      if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK 
+          && msg_anser.can_id == ID_MASTER_CAN && msg_anser.can_dlc == 2
+          && msg_anser.data[0] == NESD_commands::request_conection 
+          && msg_anser.data[1] == ID_MMNS[i]){
+          recived_mgs = true;
+      }
+    }
+
+    if(recived_mgs){
+      port->print("Tank ");
+      port->print(i+1); 
+      port->println(" Level Conected!");
+    }
+    else{  
+      port->print("NO Tank ");
+      port->print(i+1); 
+      port->println(" Level!");
+    }
+  }
+}
+
+void can_test_conection_MEOs(Stream *port){
+  for(uint8_t i = 0; i<2; i++){
+    msg_request.can_id = ID_MEO[i]; 
+    msg_request.can_dlc =1;
+    msg_request.data[0] = NESD_commands::request_conection;
+
+    can_port.sendMessage(&msg_request);
+    bool recived_mgs = false;
+    ulong last_t = millis();
+    while(!recived_mgs && (millis()-last_t)<= timeout){
+      if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK 
+          && msg_anser.can_id == ID_MASTER_CAN && msg_anser.can_dlc == 2
+          && msg_anser.data[0] == NESD_commands::request_conection 
+          && msg_anser.data[1] == ID_MEO[i]){
+          recived_mgs = true;
+      }
+    }
+
+    if(recived_mgs){
+      port->print("Odometry Sensor ");
+      port->print(i+1); 
+      port->println(" Conected!");
+    }
+    else{  
+      port->print("Odometry Sensor ");
+      port->print(i+1); 
+      port->println(" Disconected!");
+    }
+  }
+}
+
+void can_test_conection_MEDs(Stream *port){
+  for(uint8_t i = 0; i<3; i++){
+    msg_request.can_id = ID_MED[i]; 
+    msg_request.can_dlc =1;
+    msg_request.data[0] = NESD_commands::request_conection;
+
+    can_port.sendMessage(&msg_request);
+    bool recived_mgs = false;
+    ulong last_t = millis();
+    while(!recived_mgs && (millis()-last_t)<= timeout){
+      if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK 
+          && msg_anser.can_id == ID_MASTER_CAN && msg_anser.can_dlc == 2
+          && msg_anser.data[0] == NESD_commands::request_conection 
+          && msg_anser.data[1] == ID_MED[i]){
+          recived_mgs = true;
+      }
+    }
+
+    if(recived_mgs){
+      port->print("Dispenser ");
+      port->print(i+1); 
+      port->println(" Conected!");
+    }
+    else{  
+      port->print("Dispenser ");
+      port->print(i+1); 
+      port->println(" Disconected!");
+    }
+  }
+}
+
+//----- Petitions and requests -----
+
+void can_petition_Tank1_Level(){
+  msg_request.can_id = ID_MMNS[0]; 
+  msg_request.can_dlc =1;
+  msg_request.data[0] = NESD_commands::read_variable;
+
+  can_port.sendMessage(&msg_request);
+  delay(10);
+}
+
+void can_listen_Tank1_Level(Stream *port , uint8_t *level){
+  if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK &&
+      msg_anser.can_id == ID_MASTER_CAN && msg_anser.can_dlc == 2 &&
+      msg_anser.data[0] == NESD_commands::read_variable){
+        *level = (uint8_t)msg_anser.data[1];
+        port->print("Tank 1 Level = ");
+        port->println(*level);
+  }
+}
+
+void can_serch_modules(){
+  //funciones para buscar MMNS's
+  can_test_conection_MMNSs(&port_bt);
+  //funciones para buscar MEO's
+  can_test_conection_MEOs(&port_bt);
+  //funciones para buscar MED's
+  can_test_conection_MEDs(&port_bt);
+}
+
+
+
+/*
 void can_protocol_config(Stream *port){ //Configuracion de módulo
   
   pinMode(chip_selec_can,OUTPUT);
@@ -129,7 +275,7 @@ void can_serch_modules(Stream *port){
   port->println(" dispositivos!!");
 
   uint8_t temp_count = 0;
-  
+
   if(device_cout >0){
     device_list = (NESD_Device*)malloc(device_cout*sizeof(NESD_Device));
 
@@ -211,5 +357,5 @@ void can_read_LevelSeed_request(Stream *port, uint8_t num_sensor){
   }
   //return LevelOfSeed;
 }
-
+*/
 

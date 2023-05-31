@@ -8,6 +8,7 @@ BluetoothSerial port_bt;
 #include <Indication_Lights_config.h>
 #include <CAN_protocol_config.h>
 
+uint8_t tank1_level = 0;
 
 void list(){
   cmd.list();
@@ -23,11 +24,12 @@ void test_en(){
 
 void cmd_config(){
   cmd.addCommand("list",list);
+  cmd.addCommand("tank1",can_petition_Tank1_Level);
+  cmd.addCommand("conect?",can_serch_modules);
   cmd.addCommand("c",&led_color);
   cmd.addCommand("t",test_en);
   cmd.addCommand("p",&p);
   cmd.addCommand("i",&intensidad);
-  cmd.addCommand("read",can_read_LevelSeed_petition);
 
   Serial.begin(115200);
   
@@ -40,6 +42,7 @@ void setup() {
   IL_config();
   cmd_config();
   can_protocol_config(&port_bt);
+  
 
   set_lights_intensity(200);
   set_lights_color(standby_color);
@@ -47,7 +50,9 @@ void setup() {
   prev_color = (int)led_color;
   set_lights_intensity(50);
 
-  can_serch_modules(&port_bt);
+  //buscando y conectando con modulos
+  can_test_conection_MMNSs(&port_bt);
+  //can_serch_modules(&port_bt);
   last_t = millis();
 }
 
@@ -69,7 +74,5 @@ void loop() {
     }
   }
   ligths_update();
-  can_read_LevelSeed_request(&port_bt,0);
-  can_read_LevelSeed_request(&port_bt,1);
-  can_read_LevelSeed_request(&port_bt,2);
+  can_listen_Tank1_Level(&port_bt, &tank1_level);
 }
