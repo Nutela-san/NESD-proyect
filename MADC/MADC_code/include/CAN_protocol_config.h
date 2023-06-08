@@ -173,6 +173,15 @@ void can_test_conection_MEDs(Stream *port){
   }
 }
 
+void can_serch_modules(){
+  //funciones para buscar MMNS's
+  can_test_conection_MMNSs(&port_bt);
+  //funciones para buscar MEO's
+  can_test_conection_MEOs(&port_bt);
+  //funciones para buscar MED's
+  can_test_conection_MEDs(&port_bt);
+}
+
 //----- Petitions and requests -----
 
 void can_petition_Tank1_Level(){
@@ -194,16 +203,26 @@ void can_listen_Tank1_Level(Stream *port , uint8_t *level){
   }
 }
 
-void can_serch_modules(){
-  //funciones para buscar MMNS's
-  can_test_conection_MMNSs(&port_bt);
-  //funciones para buscar MEO's
-  can_test_conection_MEOs(&port_bt);
-  //funciones para buscar MED's
-  can_test_conection_MEDs(&port_bt);
+void can_petition_MEO1_Odometry(){
+  msg_request.can_id = ID_MEO[0]; 
+  msg_request.can_dlc =1;
+  msg_request.data[0] = NESD_commands::read_variable;
+
+  can_port.sendMessage(&msg_request);
+  delay(10);
 }
 
-
+void can_listen_MEO1_Odometry(Stream *port , uint8_t *speed , uint16_t *distance){
+  if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK &&
+      msg_anser.can_id == ID_MASTER_CAN && msg_anser.can_dlc == 4 &&
+      msg_anser.data[0] == NESD_commands::read_variable){
+        *speed = (uint8_t)msg_anser.data[1];
+        *distance = (uint16_t) ( (uint8_t) msg_anser.data[2] | ((uint8_t)msg_anser.data[3]<<8));
+        char msj[100]={0};
+        sprintf(msj,"Distancia = %d [m], Velocidad = %d [m/s]",distance,speed);
+        port->println(msj);
+  }
+}
 
 /*
 void can_protocol_config(Stream *port){ //Configuracion de módulo

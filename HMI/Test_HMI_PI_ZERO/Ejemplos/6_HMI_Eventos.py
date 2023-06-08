@@ -22,7 +22,7 @@ boton2 = ttk.Button(window, text= 'Boton X')
 
 
 #eventos
-window.bind('<F1>', lambda event: print(event))
+window.bind('<F4>', lambda event: print(event))
 def evento_boton1(event):
     print(f'x: {event.x}, y: {event.y}')
 boton.bind('<Motion>', evento_boton1)
