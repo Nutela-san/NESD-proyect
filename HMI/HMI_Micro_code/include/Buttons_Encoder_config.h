@@ -16,23 +16,26 @@ void update_buttons(Stream *port){
   //unsigned int button_code =  1*(set_back[0]) + 2*(set_back[1]) +
   //                            4*(up_down[0]) + 8*(up_down[1]) +
   //                            16*(tabs[0]) + 36*(tabs[1]) + 64*(tabs[2]) + 128*(tabs[3]);
-  for(uint8_t i = 0; i<4 ; i++){
-    if(i<2){
-      if(!digitalRead(set_back[i])){
-        port->print("SET_BACK = ");
-        port->println(i+1);
-        while(!digitalRead(set_back[i]));
-      }  
-      if(!digitalRead(up_down[i])){
-        port->print("up_down = ");
-        port->println(i+1);
-        while(!digitalRead(up_down[i]));
-      }  
-    }
+  if(!digitalRead(up_down[0])){
+    port->println("UP");
+    while(!digitalRead(up_down[0]));
+  }
+  if(!digitalRead(up_down[1])){
+    port->println("DOWN");
+    while(!digitalRead(up_down[1]));
+  }
+  if(!digitalRead(set_back[0])){
+    port->println("OK");
+    while(!digitalRead(set_back[0]));
+  }
+  if(!digitalRead(set_back[1])){
+    port->println("BACK");
+    while(!digitalRead(set_back[1]));
+  }
+  for(uint8_t i=0;i<4;i++){
     if(!digitalRead(tabs[i])){
-        port->print("tab = ");
-        port->println(i+1);
-        while(!digitalRead(tabs[i]));
-      }  
+      port->printf("T%d\n",i+1);
+      while(!digitalRead(tabs[i]));
+    }
   }
 }
