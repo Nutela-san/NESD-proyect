@@ -74,11 +74,17 @@ void can_send_odometry(float odometry_data[2]){
 
   msg_request.can_id = ID_MASTER_CAN; 
   msg_request.can_dlc = data_lenght;
-
-  uint8_t level_bytes[data_lenght]= {odometry_data[0], odometry_data[1]};
-
+  
+  union { 
+    float varf[2];
+    uint8_t tmp_array[data_lenght];
+  }can_data;
+  
+  can_data.varf[0] = odometry_data[0];
+  can_data.varf[1] = odometry_data[1];
+  
   for(uint8_t i = 0; i< data_lenght; i++){
-    msg_request.data[i] = level_bytes[i];
+    msg_request.data[i] = can_data.tmp_array[i];
   }
   
   can_port.sendMessage(&msg_request);

@@ -6,7 +6,7 @@
 
 SimpleCommand cmd;
 
-float odometry[2] = {0};
+float odometry[2] = {0}; // {pos,vel}
 
 void list(){
   cmd.list();
@@ -18,6 +18,8 @@ void command_config(){
 
   cmd.enable_echo(true);
   cmd.addCommand("list", list);
+  cmd.addCommand("pos", &odometry[0]);
+  cmd.addCommand("vel", &odometry[1]);
   cmd.addCommand("c",&led_color);
   cmd.addCommand("i",&intensidad);
   //cmd.addCommand("r",print_read_distance);

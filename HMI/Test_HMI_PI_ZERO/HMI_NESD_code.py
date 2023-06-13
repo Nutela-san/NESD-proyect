@@ -18,6 +18,7 @@ var1 = tk.Variable()
 
 level1 = int(50)
 level1_last = int(50)
+
 #widgets
 
 
@@ -32,18 +33,19 @@ pestana_monitor.rowconfigure(0,weight=1)
 
 pestana_config = ttk.Frame(panel_pestanas, width= int(screen_w), height=int(screen_h*0.95))
 
-tank_canvas_size = (int(screen_w*0.3) , int(screen_h*0.8))
+tank_canvas_size_o = (int(screen_w*0.25) , int(screen_h*0.7))
 
 tank1 = tk.Canvas(pestana_monitor, 
-                  width= tank_canvas_size[0], height= tank_canvas_size[1],
+                  width= tank_canvas_size_o[0], height= tank_canvas_size_o[1],
                   background= '#F0F0F0')
 
 def update_Tank_SeedLevel_Monitor_canvas(level):
+  global tank_canvas_size_o
   tank1.delete(tk.ALL)
   tank_line_wight = 5
   offSet = tank_line_wight*2
   tank_offset = tank_line_wight
-  tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+  tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
   tank_points = ( (tank_offset,tank_offset),
                   (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
@@ -56,12 +58,11 @@ def update_Tank_SeedLevel_Monitor_canvas(level):
 
   tank1.create_polygon(*tank_points, fill='grey', outline='black', width= tank_line_wight)
 
-  
   if(level >= 90):
     tank_line_wight = 8
     offSet = tank_line_wight*2
     tank_offset = tank_line_wight
-    tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+    tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
     fill_points = ( (tank_offset,tank_offset),
                     (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
@@ -76,7 +77,7 @@ def update_Tank_SeedLevel_Monitor_canvas(level):
     tank_line_wight = 8
     offSet = tank_line_wight*2
     tank_offset = tank_line_wight
-    tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+    tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
     fill_points = ( (tank_offset,tank_offset+int(tank_canvas_size[1]*0.2)),
                     (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
@@ -91,7 +92,7 @@ def update_Tank_SeedLevel_Monitor_canvas(level):
     tank_line_wight = 8
     offSet = tank_line_wight*2
     tank_offset = tank_line_wight
-    tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+    tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
     fill_points = ( (tank_offset,tank_offset+int(tank_canvas_size[1]*0.4)),
                     (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
@@ -106,7 +107,7 @@ def update_Tank_SeedLevel_Monitor_canvas(level):
     tank_line_wight = 8
     offSet = tank_line_wight*2
     tank_offset = tank_line_wight
-    tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+    tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
     fill_points = ( (tank_offset,tank_offset+int(tank_canvas_size[1]*0.55)),
                     (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
@@ -121,7 +122,7 @@ def update_Tank_SeedLevel_Monitor_canvas(level):
     tank_line_wight = 8
     offSet = tank_line_wight*2|1
     tank_offset = tank_line_wight
-    tank_canvas_size = (int(screen_w*0.3)-offSet , int(screen_h*0.8)-offSet)
+    tank_canvas_size = (tank_canvas_size_o[0]-offSet , tank_canvas_size_o[1]-offSet)
 
     fill_points = ( (tank_offset,tank_offset+int(tank_canvas_size[1]*0.7)),
                     (tank_offset+int(tank_canvas_size[0]*0.2), tank_offset+int(tank_canvas_size[1]*0.9)),
@@ -187,7 +188,7 @@ pestana_config.pack(expand= True )
 
 side_buttons_monitor.grid(row=0, column=0, sticky='nswe')
 tank1.grid(row= 0,column=1 , columnspan=2)
-
+tank1.configure(state='disabled')
 side_buttons_config.pack()
 #tank2_monitor.grid(row= 0,column=2)
 

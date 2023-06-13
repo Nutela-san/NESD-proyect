@@ -3,7 +3,7 @@
 // Se hace uso del actronimo IL (Indication_Lights)
 //---------- Definiciones de pines ----------
 
-const uint8_t IL_pin =12, num_lights = 6;
+const uint8_t IL_pin =13, num_lights = 8;
 
 float led_color = 0;
 int prev_color = 1;

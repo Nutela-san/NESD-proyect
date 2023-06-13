@@ -12,6 +12,7 @@ const float steps2rads = 2.0*3.1416 /(float) steps_per_rev;
 const float steps2degs = 360.0/(float) steps_per_rev;
 
 volatile unsigned long periodo = 0, last_t_p = 0, last_t = 0;
+volatile bool active_interrup = false;
 const unsigned long timeout_speed = 500;
 float angular_speed = 0;
 long long last_steps= 0;
@@ -41,6 +42,7 @@ void encoder_count(){
       enc_steps++;
     }
   }
+  active_interrup = true;
   last_t = last_t_p = millis();
 }
 
@@ -78,7 +80,8 @@ float encoder_angular_speed(angular_unit unit){
     last_t = millis();
     angular_speed = 0;
   }
-  else{
+  else if (active_interrup){
+    active_interrup = false;
     float freq = (1.0/(periodo*0.001));
     switch(unit){
       case angular_unit::rad:{
