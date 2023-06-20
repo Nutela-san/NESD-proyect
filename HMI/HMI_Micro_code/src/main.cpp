@@ -29,7 +29,7 @@ void cmd_config(){
 
   Serial.begin(115200);
   
-  port_bt.begin("HMI");
+  port_bt.begin("MADC ");
   cmd.enable_echo(true);
   cmd.begin(&port_bt);
 }
