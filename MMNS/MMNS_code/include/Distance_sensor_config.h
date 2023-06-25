@@ -6,9 +6,7 @@ const uint8_t rx_pin = 3, tx_pin = 2;
 unsigned char data[4] = {0};
 float distance;
 
-
 NeoSWSerial ss_port(rx_pin, tx_pin);
-
 
 void sensor_config(){
   ss_port.begin(9600);

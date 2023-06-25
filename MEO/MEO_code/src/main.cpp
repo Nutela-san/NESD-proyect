@@ -6,8 +6,6 @@
 
 SimpleCommand cmd;
 
-float odometry[2] = {0}; // {pos,vel}
-
 void list(){
   cmd.list();
 }
@@ -18,12 +16,13 @@ void command_config(){
 
   cmd.enable_echo(true);
   cmd.addCommand("list", list);
-  cmd.addCommand("pos", &odometry[0]);
-  cmd.addCommand("vel", &odometry[1]);
+  cmd.addCommand("pos", &tractor_odo.distancia.distance_float);
+  cmd.addCommand("vel", &tractor_odo.velocidad.velocity_float);
   cmd.addCommand("c",&led_color);
   cmd.addCommand("i",&intensidad);
   //cmd.addCommand("r",print_read_distance);
   cmd.begin(&Serial);
+
 }
 
 void setup() {
@@ -38,10 +37,11 @@ void setup() {
 void loop() {
   cmd.listen();
   ligths_update();
+  encoder_speed_update();
   
-  odometry[0] = encoder_angular_pos(angular_unit::deg);
-  odometry[1] = encoder_angular_speed(angular_unit::deg);
+  tractor_odo.velocidad.velocity_float = enconder_steps_speed();
+  tractor_odo.distancia.distance_float= (float) encoder_steps();
 
-  can_listen(&Serial, odometry);
+  can_listen(&Serial, tractor_odo);
 
 }

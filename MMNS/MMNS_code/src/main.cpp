@@ -38,8 +38,6 @@
     cmd.listen();
     ligths_update();
     sensor_update();
-    //can_listen(Serial, distance);
-    //can_read_LevelSeed_request(distance);
-    //can_find_module();
+
     can_listen(&Serial,distance);
   }

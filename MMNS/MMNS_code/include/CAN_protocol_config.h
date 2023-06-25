@@ -39,7 +39,8 @@ enum NESD_commands{
   set_color_light,
   set_intensity_light,
   set_variable,
-  read_variable
+  read_variable,
+  read_second_variable
 };
 
 //----- Definiciones Módulo y Pines -----
@@ -71,9 +72,10 @@ void can_protocol_config(Stream *port){ //Configuracion de módulo
 
 void can_send_TankLevel(uint8_t level){
   msg_request.can_id = ID_MASTER_CAN; 
-  msg_request.can_dlc =2;
+  msg_request.can_dlc =3;
   msg_request.data[0] = NESD_commands::read_variable;
-  msg_request.data[1] = level;
+  msg_request.data[1] = ID_MMNS[0];
+  msg_request.data[2] = level;
   can_port.sendMessage(&msg_request);
   delay(10);
 }

@@ -39,7 +39,8 @@ enum NESD_commands{
   set_color_light,
   set_intensity_light,
   set_variable,
-  read_variable
+  read_variable,
+  read_second_variable
 };
 
 //----- Definiciones Módulo y Pines -----
@@ -69,22 +70,32 @@ void can_protocol_config(Stream *port){ //Configuracion de módulo
 
 }
 
-void can_send_odometry(float odometry_data[2]){
-  const uint8_t data_lenght = 8; //float tiene 4 bytes
+void can_send_odometry_pos(Odometry data){
+  const uint8_t data_lenght = sizeof(float); //float tiene 4 bytes
 
   msg_request.can_id = ID_MASTER_CAN; 
-  msg_request.can_dlc = data_lenght;
-  
-  union { 
-    float varf[2];
-    uint8_t tmp_array[data_lenght];
-  }can_data;
-  
-  can_data.varf[0] = odometry_data[0];
-  can_data.varf[1] = odometry_data[1];
-  
+  msg_request.can_dlc = data_lenght + 2;
+  msg_request.data[0] = NESD_commands::read_variable;
+  msg_request.data[1] = ID_MEO[0];
+
   for(uint8_t i = 0; i< data_lenght; i++){
-    msg_request.data[i] = can_data.tmp_array[i];
+    msg_request.data[i+2] = data.distancia.distance_bytes[i];
+  }
+  
+  can_port.sendMessage(&msg_request);
+  delay(10);
+}
+
+void can_send_odometry_vel(Odometry data){
+  const uint8_t data_lenght = sizeof(float); //float tiene 4 bytes
+
+  msg_request.can_id = ID_MASTER_CAN; 
+  msg_request.can_dlc = data_lenght + 2;
+  msg_request.data[0] = NESD_commands::read_second_variable;
+  msg_request.data[1] = ID_MEO[0];
+
+  for(uint8_t i = 0; i< data_lenght; i++){
+    msg_request.data[i+2] = data.velocidad.velocity_bytes[i];
   }
   
   can_port.sendMessage(&msg_request);
@@ -100,7 +111,7 @@ void can_send_OK_conection(){
   delay(10);
 }
 
-void can_listen(Stream *port, float odometry_data[2]){
+void can_listen(Stream *port, Odometry odo_data){
   if( can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK && msg_anser.can_id == ID_MEO[0] &&
       msg_anser.can_dlc == 1){
     NESD_commands msj = (NESD_commands)msg_anser.data[0];
@@ -113,11 +124,20 @@ void can_listen(Stream *port, float odometry_data[2]){
         break;
       }
       case NESD_commands::read_variable:{
-        can_send_odometry(odometry_data);
-        port->print("Se envio respuesta de odometrya pos = ");
-        port->print(odometry_data[0]);
-        port->print(" vel =  ");
-        port->print(odometry_data[1]);
+        can_send_odometry_pos(odo_data);
+        port->print("Se envio respuesta de odometria pos = ");
+        port->println(odo_data.distancia.distance_float);
+        port->print("En forma de bytes: ");
+        for(uint8_t i = 0; i<sizeof(float); i++){
+          port->print(odo_data.distancia.distance_bytes[i], HEX);
+        }
+        port->println(" ");
+        break;
+      }
+      case NESD_commands::read_second_variable:{
+        can_send_odometry_vel(odo_data);
+        port->print("Se envio respuesta de odometria vel =  ");
+        port->println(odo_data.velocidad.velocity_float);
         break;
       }
       default:{
