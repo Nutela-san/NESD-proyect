@@ -23,7 +23,7 @@ enum NESD_device_type{
 
 ulong timeout = 250;
 ulong last_t_update = 0;
-ulong update_periodo = 17;
+ulong update_periodo = 20;
 uint8_t petition_state = 0;
 
 union distance{
@@ -200,11 +200,11 @@ void can_test_conection_MEDs(Stream *port){
 
 void can_serch_modules(){
   //funciones para buscar MMNS's
-  can_test_conection_MMNSs(&port_bt);
+  can_test_conection_MMNSs(&Serial);
   //funciones para buscar MEO's
-  can_test_conection_MEOs(&port_bt);
+  can_test_conection_MEOs(&Serial);
   //funciones para buscar MED's
-  can_test_conection_MEDs(&port_bt);
+  can_test_conection_MEDs(&Serial);
 }
 
 //----- Petitions and requests -----
@@ -344,13 +344,11 @@ void can_update(){
       }
       case 4:{
          //can_petition_MED1_seedout2();
-        petition_state = 0;
+        petition_state =0;
         break;
       }
-      case 5:{
-        can_serch_modules();
-        petition_state = 0;
-        break;
+      default:{
+        break; //nada
       }
     }
     update_periodo = millis();

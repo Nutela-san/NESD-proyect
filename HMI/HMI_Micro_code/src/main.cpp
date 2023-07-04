@@ -37,7 +37,7 @@ void cmd_config(){
   //cmd.begin(&port_bt);
 }
 
-void setup() {  
+void setup() {    
   IL_config();
   perifericos_config();
   cmd_config();
@@ -59,6 +59,7 @@ void setup() {
         set_lights_color(configured_color);
       }
     }
+    update_buttons(&Serial);
   }
   port_bt.connect("MADC"); //conectando al MADC
   while(!port_bt.connected(5000)){
@@ -66,7 +67,7 @@ void setup() {
   }
   Serial.println("HMI CONECTED");
   port_bt.println("MADC_conect");
-  led_color = 0; 
+  led_color = 0;
 }
 
 void loop() {
@@ -95,6 +96,6 @@ void loop() {
   }
 
   ligths_update();
-  update_buttons(&port_bt);
+  update_buttons(&Serial);
 }
 

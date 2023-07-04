@@ -1,4 +1,10 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <AS5600.h>
+
+AS5600 perilla;
+uint16_t last_angule = 0;
+const uint16_t encoder_steps = 4095/10;
 
 uint8_t set_back[2] = {14,12}, up_down[2] = {15,32}, tabs[4] = {33,25,26,27};
 
@@ -10,6 +16,12 @@ void perifericos_config(){
     }
     pinMode(tabs[i],INPUT_PULLUP);
   }
+
+  perilla.begin(AS5600_SW_DIRECTION_PIN);
+  perilla.setSlowFilter(0);
+  perilla.setHysteresis(2);
+  
+  last_angule = perilla.readAngle();
 }
 
 void update_buttons(Stream *port){
@@ -37,5 +49,18 @@ void update_buttons(Stream *port){
       port->printf("T%d\n",i+1);
       while(!digitalRead(tabs[i]));
     }
+  }
+
+  //uint16_t current_angule = perilla.readAngle();
+  int change_in_encoder = perilla.readAngle() - last_angule;
+      
+
+  if(change_in_encoder >= encoder_steps ){
+    last_angule = perilla.readAngle();
+    port->println("R_DOWN");
+  }
+  else if(change_in_encoder <= -encoder_steps){
+    last_angule = perilla.readAngle();
+    port->println("R_UP");
   }
 }

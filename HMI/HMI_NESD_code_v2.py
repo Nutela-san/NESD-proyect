@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
+import serial
+from serial.tools import list_ports
+
 
 #----------------------- creacion de la ventana -------------------------------------
 window = tk.Tk() # crea la ventana apartir de un metodo de tk
@@ -10,12 +13,14 @@ screen_h = 700#int(window.winfo_screenheight()*0.9)
 
 window.geometry(f'{screen_w}x{screen_h}+0+0')
 window.resizable(False, False) # para no poder escalar las dimeciones de la ventana
+#window.overrideredirect(True)
 
 paleta_color = ('#ff1d44',  #rojo
                 '#f0f6b9',  #amarillo
                 '#9fd9b3',  #verde
                 '#3ea3af',  #azul
                 '#81657e')  #morado
+
 #----------------------- widgets Plantillas-------------------------------------
 
 class Tank_monitor(ttk.Frame):
@@ -187,7 +192,7 @@ class Odometry_monitor(ttk.Frame):
     super().__init__(parent)
     super().configure(relief= 'groove', border= 5)#añade un borde para ver los limites
     self.parent = parent
-    self.tractor_img = tk.PhotoImage(file='resources/tractor_odometri_300.png',width=300)
+    self.tractor_img = tk.PhotoImage(file='./resources/tractor_odometri_300.png',width=300)
     self.odometry_data = odometry_data
     #-- configurando grid --
     self.columnconfigure((0,1), weight=1)
@@ -345,10 +350,12 @@ class Select_btns(ttk.Frame):
 
 
 class initial_tab(ttk.Frame):
-  def __init__(self, parent, size):
+  def __init__(self, parent, size, tab_serial_config):
     super().__init__(parent)
     super().configure(relief= 'groove', border= 5)#añade un borde para ver los limites
     self.parent = parent
+    self.serial_tab = tab_serial_config
+    self.id_check_buttos = ()
     #-- configurando grid --
     self.config(width= size[0], height= size[1])
     self.columnconfigure((0,2),weight=1)
@@ -358,8 +365,8 @@ class initial_tab(ttk.Frame):
     self.rowconfigure(2,weight=1)
 
     #-- Elementos (widgets) --
-    self.photo_ipn = tk.PhotoImage(file='resources/LOGOTIPO_IPN_300.png',width=300)
-    self.photo_upiiz = tk.PhotoImage(file='resources/UPIIZ_logo_300.png',width=300)
+    self.photo_ipn = tk.PhotoImage(file='./resources/LOGOTIPO_IPN_300.png',width=300)
+    self.photo_upiiz = tk.PhotoImage(file='./resources/UPIIZ_logo_300.png',width=300)
     
     self.IPN_LOGO = ttk.Label(self, image= self.photo_ipn)#text='poner logo', anchor='center')
     self.UPIIZ_LOGO = ttk.Label(self, image= self.photo_upiiz)#text='poner logo', anchor='center')
@@ -379,12 +386,234 @@ class initial_tab(ttk.Frame):
     self.main_title.grid(row=0, column=1, sticky='nswe')
     self.secod_title.grid(row=1,column=1, sticky='nswe')
     self.INICIAR_btn.grid(row=2, column=1, sticky='nswe')
+  
+  def check_buttons(self):
+    #0 OK BTN     # lista para con el status de botones presionados.
+    #1 BACK BTN
+    #2 UP BTN
+    #3 DOWN BTN
+    #4 R_UP  perilla 
+    #5 R_DOWN perilla 
+    #6 TAB 1
+    #7 TAB 2
+    #8 TAB 3
+    #9 TAB 4
+
+    if self.serial_tab.read_button_status(button_num=0): #0 OK BTN
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=1): #1 BACK BTN
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=7): #7 TAB 2
+      self.parent.select(1)
+    elif self.serial_tab.read_button_status(button_num=8): #8 TAB 3
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=9): #9 TAB 4
+      self.parent.select(3)
+
+    self.id_check_buttos =  self.after(100, self.check_buttons)
+
+class config_serial_tab(ttk.Frame):
+  def __init__(self, parent, size, tank_parameters, odometry_parameters):
+    super().__init__(parent)
+    super().configure(relief= 'groove', border= 5)#añade un borde para ver los limites
+    self.main_size = size
+    self.parent = parent
+    self.conected = False
+    self.tank_parameters = tank_parameters
+    self.odometry_parameters = odometry_parameters
+
+    self.modules_status_conection = [] # estatus de conexion de modulos.
+    self.available_serial_ports = [] #lista de puertos disponibles
+    self.conexion_test_callback = ()
+    self.status_btns_list = [ False,  #0 OK BTN     # lista para con el status de botones presionados.
+                              False,  #1 BACK BTN
+                              False,  #2 UP BTN
+                              False,  #3 DOWN BTN
+                              False,  #4 R_UP  perilla 
+                              False,  #5 R_DOWN perilla 
+                              False,  #6 TAB 1
+                              False,  #7 TAB 2
+                              False,  #8 TAB 3
+                              False]  #9 TAB 4
+    
+    self.cmd_port = None
+    self.id_task_readSerial = None
+    #-- configurando grid --
+    self.columnconfigure((0,1), weight=1)
+    self.columnconfigure(2, weight=3)
+    self.rowconfigure((0,2), weight=1)
+    self.rowconfigure(1, weight= 2)
+
+    #-- Elementos (widgets) --
+    self.serial_ports_combobox = ttk.Combobox(self, state= 'readonly')
+    self.serial_config_btns = Option_btns(self, Btn_UP_name= 'SELECCIÓN\nDE\nPUERTO\nSERIAL',
+                                          Btn_DOWN_name= 'CONECTAR',
+                                          height= self.main_size[1],
+                                          font_text='Arial 18 bold')
+    self.serial_command_log_text = tk.Text( self, width= int(self.main_size[0]*0.1), 
+                                            height=int(self.main_size[1]*0.5))
+    
+    #-- empaquedato en grid --
+    self.serial_config_btns.grid(row=1,column=0, sticky='nswe')
+    self.serial_ports_combobox.grid(row=1, column=1, sticky='swe', pady=int(size[1]*0.4))
+    self.serial_command_log_text.grid(row=1, column=2)
+
+    #-- Eventos --
+    self.serial_config_btns.config_fuctions(Btn_UP_func= self.Update_serial_ports,
+                                            Btn_DOWN_func= self.doSerialConection)
+    self.Update_serial_ports()
+    if self.serial_ports_combobox.current() != None:
+      self.after(100,self.doSerialConection)
+
+  def Update_serial_ports(self):
+    self.available_serial_ports = [port.device for port in list_ports.comports()]
+    self.serial_ports_combobox["values"] = self.available_serial_ports
+    if self.available_serial_ports != None:
+      self.serial_ports_combobox.current(0)
+      #self.doSerialConection()
+
+  def doSerialConection(self):
+    
+    puerto_seleccionado = self.serial_ports_combobox.get()
+    if puerto_seleccionado:
+      try:
+        self.cmd_port = serial.Serial(puerto_seleccionado, 115200)
+        self.serial_command_log_text.config(state="normal")
+        self.serial_command_log_text.delete("1.0", tk.END)
+        self.serial_config_btns.Btn_UP.config(state='disabled')#self.boton_conectar.config(state="disabled")
+        self.serial_config_btns.Btn_DOWN.configure(text='DESCONECTAR', command= self.disconectSerial)
+        self.serial_command_log_text.insert(tk.END, "Conexión establecida con el puerto serial: " + puerto_seleccionado + "\n")
+        #self.leer_puerto_serial()
+        self.conected = True
+        self.read_serial_port()
+
+      except serial.SerialException:
+        self.serial_command_log_text.insert(tk.END, "Error al conectar al puerto " + puerto_seleccionado + "\n")
+
+  def disconectSerial(self):
+    puerto_seleccionado = self.serial_ports_combobox.get()
+    #if self.cmd_port is None and self.cmd_port.is_open:
+    #  try:
+    if self.cmd_port is not None and self.cmd_port.is_open:
+      self.cmd_port.close()
+      self.serial_config_btns.Btn_UP.config(state='normal')
+      self.serial_config_btns.Btn_DOWN.configure(text='CONECTAR', command= self.doSerialConection)
+      if self.id_task_readSerial is not None:
+        self.after_cancel(self.id_task_readSerial)
+      self.serial_command_log_text.insert(tk.END, "Desconectado de puerto serial " + puerto_seleccionado + "\n")
+      self.conected = False
+      #except:
+      #  self.serial_command_log_text.insert(tk.END, "No se pudo, desconectar del " + puerto_seleccionado + "\n")
+
+  def read_serial_port(self):
+    if self.cmd_port is None or not self.cmd_port.is_open:
+      return
+    try:
+      if self.cmd_port.in_waiting > 0:
+        dato = self.cmd_port.readline().strip().decode()
+        self.check_command(dato)
+        if not dato.startswith('TANK1'):
+          self.serial_command_log_text.insert(tk.END, dato + "\n")
+    except serial.SerialException:
+      self.serial_command_log_text.insert(tk.END, "Error al leer el puerto serial\n")
+      
+    self.id_task_readSerial = self.after(50, self.read_serial_port)
+  
+  def check_command(self, text):
+    if '=' in text:
+      command,value_s = text.split('=')
+      command.strip()
+      value_s.strip()
+      if command.startswith('conetion_status'):
+        valores = value_s.split(',')
+        #self.modules_status_conection = ( bool(valores[0]),bool(valores[1]), bool(valores[2]), bool(valores[3]),
+        #                                  bool(valores[4]),bool(valores[5]), bool(valores[6]), bool(valores[7])) 
+        self.modules_status_conection = [bool(valor) for valor in valores]
+      elif  command.startswith('TANK1'):  
+        self.tank_parameters[0].set(int(value_s))
+        print(f'nivel de tanque = {int(value_s)}')
+      elif  command.startswith('SeedOuts_t1'):
+        valores = value_s.split(',')
+        self.tank_parameters[1].set(int(valores[0]))
+        self.tank_parameters[2].set(int(valores[1]))
+      elif  command.startswith('odometry'):
+        valores = value_s.split(',')
+        self.odometry_parameters.set(float(valores[1]))
+        self.odometry_parameters.set(int(valores[0]))
+    else:
+
+      command = text
+      if command == 'MADC_conection_OK':
+        self.conexion_test_callback()
+
+      elif command == 'OK':
+        self.status_btns_list[0] = True
+
+      elif command == 'BACK':
+        self.status_btns_list[1] = True
+      elif command == 'UP':
+        self.status_btns_list[2] = True
+      elif command == 'DOWN':
+        self.status_btns_list[3] = True
+      elif command == 'R_UP':
+        self.status_btns_list[4] = True
+      elif command == 'R_DOWN':
+        self.status_btns_list[5] = True
+      elif command == 'T1':
+        self.status_btns_list[6] = True
+      elif command == 'T2':
+        self.status_btns_list[7] = True
+      elif command == 'T3':
+        self.status_btns_list[8] = True
+      elif command == 'T4':
+        self.status_btns_list[9] = True
+      
+  def set_conction_callback(self, funtion_callback):
+    self.conexion_test_callback = funtion_callback
+
+  def read_button_status(self, button_num):
+    state = self.status_btns_list[button_num]
+    self.status_btns_list[button_num] = False
+    return state
+  
+  def reset_button_status(self):
+    for i in range(len(self.status_btns_list)):
+      self.status_btns_list[i] = False
+  
+  def check_buttons(self):
+    if self.read_button_status(button_num=2): #2 UP BTN
+      self.Update_serial_ports()
+    elif self.read_button_status(button_num=3): #3 DOWN BTN
+      if self.conected:
+        self.disconectSerial()
+      else:
+        self.doSerialConection()
+    elif self.read_button_status(button_num=4): #4 R_UP  perilla 
+      pass
+    elif self.read_button_status(button_num=5): #5 R_DOWN perilla
+      pass
+    elif self.read_button_status(button_num=6): #6 TAB 1
+      self.parent.select(0)
+    elif self.read_button_status(button_num=7): #7 TAB 2
+      self.parent.select(1)
+    elif self.read_button_status(button_num=8): #8 TAB 3
+      self.parent.select(2)
+    elif self.read_button_status(button_num=9): #9 TAB 4
+      self.parent.select(3)
+
+    self.id_check_buttos =  self.after(100, self.check_buttons)
 
 class config_tab(ttk.Frame):
-  def __init__(self, parent, size):
+  def __init__(self, parent, size, tab_serial_config):
     super().__init__(parent)
     super().configure(relief= 'groove', border= 5)#añade un borde para ver los limites
     self.parent = parent
+    self.serial_tab = tab_serial_config
+    self.button_selec_state = 0 # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+    
+    self.seed_quantity = -1
+    self.distance_for_seed = -1
+
     #-- configurando grid --
     self.rowconfigure((0,2), weight=1)
     self.rowconfigure(1, weight=8)
@@ -409,13 +638,70 @@ class config_tab(ttk.Frame):
     self.main_title.grid(row=0,column=0,columnspan=2,sticky='nswe')
     self.siembra_parameters.grid(row=1,column=0, sticky='we')
     self.description_label.grid(row=1,column=2,columnspan=2, sticky='nswe',)
-    self.dispensacion_check_label.grid(row=2, column=1, sticky='nswe')
+    self.dispensacion_check_label.grid(row=2, column=0, columnspan=2, sticky='nswe')
     self.OK_btn.grid(row=2,column=2, sticky='nswe')
 
+  def check_buttons(self):
+    if self.serial_tab.read_button_status(button_num=0): #0 OK BTN
+      if self.seed_quantity >0 and self.distance_for_seed >0:
+        self.dispensacion_check_label.config(text= f'DISPENSACIÓN DE { self.seed_quantity} SEMILLAS POR CADA {self.distance_for_seed} METROS')
+      else:
+        self.dispensacion_check_label.config(text= 'CONFIGURA TODOS LOS PARAMETRO DE SIEMBRA')
+    elif self.serial_tab.read_button_status(button_num=1): #1 BACK BTN
+      self.dispensacion_check_label.config(text= 'RECONFIGURA LOS PARAMETRO DE SIEMBRA')
+    elif self.serial_tab.read_button_status(button_num=2): #2 UP BTN
+      self.button_selec_state = 1
+      print('SELECIONANDO LA CANTIDAD DE SEMILLA')
+      if self.seed_quantity >0:
+        print('Programar comando seteo de cantidad de semilla')
+    elif self.serial_tab.read_button_status(button_num=3): #3 DOWN BTN
+      self.button_selec_state = 2
+      print('SELECIONANDO LA CANTIDAD DE DISTANCIA')
+      if self.distance_for_seed >0:
+        print('Programar comando seteo de distancia')
+
+    elif self.serial_tab.read_button_status(button_num=4): #4 R_UP  perilla 
+      # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+      if self.button_selec_state == 1:
+        self.seed_quantity += 1
+        self.seed_quantity = min(30,self.seed_quantity)
+        self.siembra_parameters.parameter_value_up.config(text= f'{self.seed_quantity}')
+      elif self.button_selec_state == 2:
+        self.distance_for_seed += 1
+        self.distance_for_seed = min(30,self.distance_for_seed)
+        self.siembra_parameters.parameter_value_down.config(text= f'{self.distance_for_seed}')
+    elif self.serial_tab.read_button_status(button_num=5): #5 R_DOWN perilla
+      # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+      if self.button_selec_state == 1:
+        self.seed_quantity -= 1
+        self.seed_quantity = max(0,self.seed_quantity)
+        self.siembra_parameters.parameter_value_up.config(text= f'{self.seed_quantity}')
+      elif self.button_selec_state == 2:
+        self.distance_for_seed -= 1
+        self.distance_for_seed = max(0,self.distance_for_seed)
+        self.siembra_parameters.parameter_value_down.config(text= f'{self.distance_for_seed}')
+    elif self.serial_tab.read_button_status(button_num=6): #6 TAB 1
+      self.parent.select(0)
+    elif self.serial_tab.read_button_status(button_num=7): #7 TAB 2
+      self.parent.select(1)
+    elif self.serial_tab.read_button_status(button_num=8): #8 TAB 3
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=9): #9 TAB 4
+      self.parent.select(3)
+
+    self.id_check_buttos =  self.after(100, self.check_buttons)
+
 class test_tab(ttk.Frame):
-  def __init__(self, parent, size , tank_parameters, odometry_parameters):
+  def __init__(self, parent, size , tank_parameters, odometry_parameters , tab_serial_config):
     super().__init__(parent)
     self.parent = parent
+    self.serial_tab = tab_serial_config
+
+    self.menu_state = 0 # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1
+    self.button_selec_state = 0 # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+
+    self.seed_dispens_check_quantity = [-1,-1]
+
     self.main_frame_size = size
     self.motitor_tank_size = (int(self.main_frame_size[0]*0.25) , int(self.main_frame_size[1]*0.85)) 
 
@@ -540,64 +826,169 @@ class test_tab(ttk.Frame):
     self.sensores_tank_monitor.disabled_monitor()
     self.sensores_odometry_monitor.disabled_monitor()
     #-- eventos --
-    def change2SensorTestTab():
-      self.selection_test_tab.grid_forget()
-      self.conection_test_tab.grid_forget()
-      self.sensores_test_tab.grid(row=0, column=0, sticky='nswe')
 
-    def change2SelectTestTab():
-      self.sensores_test_tab.grid_forget()
-      self.conection_test_tab.grid_forget()
-      self.selection_test_tab.grid(row=0, column=0, sticky='nswe')
-
-    def change2ConectionTestTab():
-      self.selection_test_tab.grid_forget()
-      self.sensores_test_tab.grid_forget()
-      self.conection_test_tab.grid(row=0, column=0, sticky='nswe')
-
-    def chage2SensorTestSensor():
-      self.sensores_tank_monitor.grid_forget()
-      self.sensores_set_seed_dispence_btns.grid_forget()
-      self.sensores_decription_label.grid(row=0,column=1,columnspan=2, sticky='nswe')
-      self.sensores_tank_selec_btns.grid(row=0,column=0, sticky='nswe')
-      self.sensores_OKBACK_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar btn'),
-                                                Btn_BACK_func= change2SelectTestTab)
-      self.sensores_OKBACK_btns.Btn_OK.grid_forget()
-
-    def set_tolva1():
-      self.sensores_decription_label.grid_forget()
-      self.sensores_tank_monitor.grid(row=0, column=2, columnspan=1, sticky='nswe')
-      self.sensores_tank_selec_btns.grid_forget()
-      self.sensores_set_seed_dispence_btns.grid(row=0,column=0,columnspan=2, sticky='nswe')
-      
-      self.sensores_OKBACK_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar btn'),
-                                                Btn_BACK_func= chage2SensorTestSensor)
-      self.sensores_OKBACK_btns.Btn_OK.grid_forget()
-
-    def doTestConection():
-      #Insertar codigo para test de conexion de MADC
-      self.conection_state_label.config(text='¡CONECTADO!', background=paleta_color[2])
-      self.conextion_test_btns.Btn_UP.config(state='disable')
-      self.sensores_tank_selec_btns.enabled_btns()
-      self.sensores_set_seed_dispence_btns.enable_parameters()
-      self.sensores_tank_monitor.enable_monitor()
-      self.sensores_odometry_monitor.enable_monitor()
-
-    self.selection_test_btns.config_fuctions( Btn_UP_func= change2ConectionTestTab,
-                                              Btn_DOWN_func= change2SensorTestTab)
+    self.selection_test_btns.config_fuctions( Btn_UP_func= self.change2ConectionTestTab,
+                                              Btn_DOWN_func= self.change2SensorTestTab)
     self.sensores_OKBACK_btns.config_fuctions( Btn_OK_func= lambda: print('xd'),
-                                        Btn_BACK_func= change2SelectTestTab)
-    self.sensores_tank_selec_btns.config_fuctions(Btn_UP_func= set_tolva1,
+                                        Btn_BACK_func= self.change2SelectTestTab)
+    self.sensores_tank_selec_btns.config_fuctions(Btn_UP_func= self.set_tolva1,
                                                   Btn_DOWN_func= lambda: print('ocultar boton'))
     self.conection_setBack_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar boton'),
-                                                Btn_BACK_func= change2SelectTestTab)
-    self.conextion_test_btns.config_fuctions( Btn_UP_func=doTestConection,
+                                                Btn_BACK_func= self.change2SelectTestTab)
+    self.conextion_test_btns.config_fuctions( Btn_UP_func=self.doTestConection,
                                               Btn_DOWN_func= lambda: print('Config. Funcion'))
 
+  def change2SensorTestTab(self):
+    self.selection_test_tab.grid_forget()
+    self.conection_test_tab.grid_forget()
+    self.sensores_test_tab.grid(row=0, column=0, sticky='nswe')
+    self.serial_tab.reset_button_status()
+    self.menu_state = 2
+
+  def change2SelectTestTab(self):
+    self.sensores_test_tab.grid_forget()
+    self.conection_test_tab.grid_forget()
+    self.selection_test_tab.grid(row=0, column=0, sticky='nswe')
+    self.serial_tab.reset_button_status()
+    self.menu_state = 0
+
+  def change2ConectionTestTab(self):
+    self.selection_test_tab.grid_forget()
+    self.sensores_test_tab.grid_forget()
+    self.conection_test_tab.grid(row=0, column=0, sticky='nswe')
+    self.serial_tab.reset_button_status()
+    self.menu_state = 1
+
+  def chage2SensorTestSensor(self):
+    self.sensores_tank_monitor.grid_forget()
+    self.sensores_set_seed_dispence_btns.grid_forget()
+    self.sensores_decription_label.grid(row=0,column=1,columnspan=2, sticky='nswe')
+    self.sensores_tank_selec_btns.grid(row=0,column=0, sticky='nswe')
+    self.sensores_OKBACK_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar btn'),
+                                              Btn_BACK_func= self.change2SelectTestTab)
+    self.sensores_OKBACK_btns.Btn_OK.grid_forget()
+    self.serial_tab.reset_button_status()
+    self.menu_state = 2
+
+  def set_tolva1(self):
+    self.sensores_decription_label.grid_forget()
+    self.sensores_tank_monitor.grid(row=0, column=2, columnspan=1, sticky='nswe')
+    self.sensores_tank_selec_btns.grid_forget()
+    self.sensores_set_seed_dispence_btns.grid(row=0,column=0,columnspan=2, sticky='nswe')
+    
+    self.sensores_OKBACK_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar btn'),
+                                              Btn_BACK_func= self.chage2SensorTestSensor)
+    self.sensores_OKBACK_btns.Btn_OK.grid_forget()
+    self.serial_tab.reset_button_status()
+    self.menu_state = 3
+    print(self.menu_state)
+
+  def doTestConection(self):
+    #Insertar codigo para test de conexion de MADC
+    self.serial_tab.cmd_port.write('H'.encode())
+
+  def check_modules_conection(self):
+    self.serial_tab.cmd_port.write('Check_Modules\n'.encode())
+    self.update_list_modules()
+    self.id_check_modules = self.parent.after(1000, self.check_modules_conection)
+    
+  def check_buttons(self):
+    if self.serial_tab.read_button_status(button_num=0): #0 OK BTN
+      if self.menu_state == 1: # Menu de test de conexion
+        self.change2SelectTestTab()
+      elif self.menu_state ==3: # Menu de tolva
+        self.change2SensorTestTab()
+    elif self.serial_tab.read_button_status(button_num=1): #1 BACK BTN
+      if self.menu_state == 1: # Menu de test de conexion
+        self.change2SelectTestTab()
+      elif self.menu_state == 2: #Menu de test de sensores
+        self.change2SelectTestTab()
+      elif self.menu_state == 3: #Menu de tolva1
+        self.chage2SensorTestSensor()
+    elif self.serial_tab.read_button_status(button_num=2): #2 UP BTN
+      # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1
+      if self.menu_state == 0: # Menu de selecion de test
+        self.change2ConectionTestTab()
+      elif self.menu_state == 1: # Menu de test de conexion
+        self.doTestConection()
+      elif self.menu_state == 2: #Menu de test de sensores
+        self.set_tolva1()
+      elif self.menu_state == 3: #Menu de tolva1
+        self.button_selec_state = 1
+        print('SELECIONANDO LA CANTIDAD DE SEMILLA 1')
+        if self.seed_dispens_check_quantity[0]>0:
+          print('Programar comando test, salida1')
+          self.seed_dispens_check_quantity[0] = 0
+          self.sensores_set_seed_dispence_btns.parameter_value_up.config(text=f'{self.seed_dispens_check_quantity[0]}')
+    elif self.serial_tab.read_button_status(button_num=3): #3 DOWN BTN
+      # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1
+      if self.menu_state == 0: # Menu de selecion de test
+        self.change2SensorTestTab()
+      elif self.menu_state == 1: # Menu de test de conexion
+        self.check_modules_conection()
+      elif self.menu_state == 2: #Menu de test de sensores
+        self.set_tolva1()
+      elif self.menu_state == 3: #Menu de tolva1
+        self.button_selec_state = 2
+        print('SELECIONANDO LA CANTIDAD DE SEMILLA 2')
+        if self.seed_dispens_check_quantity[1]>0:
+          print('Programar comando test, salida2')
+          self.seed_dispens_check_quantity[1] = 0
+          self.sensores_set_seed_dispence_btns.parameter_value_down.config(text=f'{self.seed_dispens_check_quantity[1]}')
+    elif self.serial_tab.read_button_status(button_num=4): #4 R_UP  perilla
+      # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1 
+      if self.menu_state == 3: #Menu de tolva1
+        # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+        if self.button_selec_state == 1:
+          self.seed_dispens_check_quantity[0] +=1
+          self.seed_dispens_check_quantity[0] = min(50,self.seed_dispens_check_quantity[0])
+          self.sensores_set_seed_dispence_btns.parameter_value_up.config(text=f'{self.seed_dispens_check_quantity[0]}')
+        elif self.button_selec_state == 2:
+          self.seed_dispens_check_quantity[1] +=1
+          self.seed_dispens_check_quantity[1] = min(50,self.seed_dispens_check_quantity[1])
+          self.sensores_set_seed_dispence_btns.parameter_value_down.config(text=f'{self.seed_dispens_check_quantity[1]}')
+    elif self.serial_tab.read_button_status(button_num=5): #5 R_DOWN perilla
+      # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1
+      if self.menu_state == 3: #Menu de tolva1
+        # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
+        if self.button_selec_state == 1:
+          self.seed_dispens_check_quantity[0] -=1
+          self.seed_dispens_check_quantity[0] = max(0,self.seed_dispens_check_quantity[0])
+          self.sensores_set_seed_dispence_btns.parameter_value_up.config(text=f'{self.seed_dispens_check_quantity[0]}')
+        elif self.button_selec_state == 2:
+          self.seed_dispens_check_quantity[1] -=1
+          self.seed_dispens_check_quantity[1] = max(0,self.seed_dispens_check_quantity[1])
+          self.sensores_set_seed_dispence_btns.parameter_value_down.config(text=f'{self.seed_dispens_check_quantity[1]}')
+    elif self.serial_tab.read_button_status(button_num=6): #6 TAB 1
+      self.parent.select(0)
+    elif self.serial_tab.read_button_status(button_num=7): #7 TAB 2
+      self.parent.select(1)
+    elif self.serial_tab.read_button_status(button_num=8): #8 TAB 3
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=9): #9 TAB 4
+      self.parent.select(4)
+
+    self.id_check_buttos =  self.after(100, self.check_buttons)
+
+  def update_list_modules(self):
+    #Se eliminan todo lo listado
+    self.conection_module_list.delete(*self.conection_module_list.get_children())
+    for i in range(len(self.serial_tab.modules_status_conection)):
+      if i<3:   #MMNS's
+        if self.serial_tab.modules_status_conection[i]:
+          self.conection_module_list.insert('',tk.END,(f'MMNS {i+1}', 'SENSOR', 'CONECTADO'))
+      elif i<5: #MEO's
+        if self.serial_tab.modules_status_conection[i]:
+          self.conection_module_list.insert('',tk.END,(f'MEO {i-2}', 'SENSOR', 'CONECTADO'))
+      elif i<8: #MED's
+        if self.serial_tab.modules_status_conection[i]:
+          self.conection_module_list.insert('',tk.END,(f'MEO {i-4}', 'ACTUADOR/SENSOR', 'CONECTADO'))
+
 class monitor_tab(ttk.Frame):
-  def __init__(self, parent, size, tank_parameters, odometry_parameters):
+  def __init__(self, parent, size, tank_parameters, odometry_parameters,tab_serial_config):
     super().__init__(parent)
     self.parent = parent
+    self.serial_tab = tab_serial_config
     self.main_size = size
     self.motitor_tank_size = (int(self.main_size[0]*0.25) , int(self.main_size[1]*0.85))
     #-- configurando grid --
@@ -619,7 +1010,8 @@ class monitor_tab(ttk.Frame):
     self.monitor_SiembraParameter_label = tk.Label( self,text='Poner los parametros\nde Siembra',
                                                     anchor='center')
     self.monitor_warning_label = tk.Label(self, 
-                                          text= 'SE NECESITA CONFIGURAR PRIMERO:\n-> CONEXIÓN INALAMBRICA DE SISTEMA \n-> PARAMETROS DE SIEMBRE')
+                                          text= 'SE NECESITA CONFIGURAR PRIMERO:\n-> CONEXIÓN INALÁMBRICA DE SISTEMA \n-> PARAMETROS DE SIEMBRA',
+                                          font= 'Arial 30 bold')
     #-- empaquedato en grid --
     self.monitor_tolva1.grid(row=0,rowspan=3, column=0,columnspan=2, sticky= 'nswe')
     self.monitor_odometry.grid(row=0,column=2, sticky= 'nswe')
@@ -645,6 +1037,31 @@ class monitor_tab(ttk.Frame):
     self.monitor_start_btn.grid_forget()
     self.monitor_PauseBack_btns.grid(row=2,column=2, sticky='nswe')
 
+  def check_buttons(self):
+
+    if self.serial_tab.read_button_status(button_num=0): #0 OK BTN
+      pass
+    elif self.serial_tab.read_button_status(button_num=1): #1 BACK BTN
+      pass
+    elif self.serial_tab.read_button_status(button_num=2): #2 UP BTN
+      pass
+    elif self.serial_tab.read_button_status(button_num=3): #3 DOWN BTN
+      pass
+    elif self.serial_tab.read_button_status(button_num=4): #4 R_UP  perilla 
+      pass
+    elif self.serial_tab.read_button_status(button_num=5): #5 R_DOWN perilla
+      pass
+    elif self.serial_tab.read_button_status(button_num=6): #6 TAB 1
+      self.parent.select(1)
+    elif self.serial_tab.read_button_status(button_num=7): #7 TAB 2
+      self.parent.select(2)
+    elif self.serial_tab.read_button_status(button_num=8): #8 TAB 3
+      self.parent.select(3)
+    elif self.serial_tab.read_button_status(button_num=9): #9 TAB 4
+      self.parent.select(3)
+
+    self.id_check_buttos =  self.after(100, self.check_buttons)
+
 
 #----------------------- variables tkinter -------------------------------------
 level1 = tk.IntVar(value=0)
@@ -656,20 +1073,27 @@ tolva_variables = (level1,SeedOut_t1[0],SeedOut_t1[1])
 #----------------------- widgets -------------------------------------
 panel_pestanas = ttk.Notebook(window, width= int(screen_w), height=int(screen_h*0.99))
 
-pestana_inicial = initial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)) )
+pestana_config_serial = config_serial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
+                                          tank_parameters= tolva_variables, odometry_parameters= tractor_odometry)
 
-pestana_config = config_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)))
+pestana_inicial = initial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
+                              tab_serial_config= pestana_config_serial)
+
+pestana_config = config_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)), tab_serial_config= pestana_config_serial)
 
 pestana_tests = test_tab( panel_pestanas,size=(int(screen_w),int(screen_h*0.99)),
-                          tank_parameters= tolva_variables, odometry_parameters= tractor_odometry)
+                          tank_parameters= tolva_variables, odometry_parameters= tractor_odometry,
+                          tab_serial_config= pestana_config_serial)
 
 pestana_monitor = monitor_tab(  panel_pestanas, size= (int(screen_w),int(screen_h*0.99)),
-                                tank_parameters= tolva_variables, odometry_parameters= tractor_odometry)
+                                tank_parameters= tolva_variables, odometry_parameters= tractor_odometry,
+                                tab_serial_config= pestana_config_serial)
 
 pestana_monitor.disabled()
 
 #----------------------- enpaquetado -------------------------------------
 panel_pestanas.add(pestana_inicial,  text= '      INICIO     ')
+panel_pestanas.add(pestana_config_serial, text = '  SERIAL CONFIG  ')
 panel_pestanas.add(pestana_config,   text= '  CONFIGURACIÓN  ')
 panel_pestanas.add(pestana_tests ,   text= '     PRUEBAS     ')
 panel_pestanas.add(pestana_monitor , text= '     MONITOR     ')
@@ -693,6 +1117,18 @@ window.bind('<KeyPress-l>', lambda event: tractor_odometry[0].set(tractor_odomet
 pestana_inicial.INICIAR_btn.config(command= lambda: panel_pestanas.select(1))
 
 def doConection_v2():
+  pestana_config_serial.cmd_port.write('H'.encode())
+
+  #pestana_tests.conection_state_label.config(text='¡CONECTADO!', background=paleta_color[2])
+  #pestana_tests.conextion_test_btns.Btn_UP.config(state='disable')
+  #pestana_tests.sensores_tank_selec_btns.enabled_btns()
+  #pestana_tests.sensores_set_seed_dispence_btns.enable_parameters()
+  #pestana_tests.sensores_tank_monitor.enable_monitor()
+  #pestana_tests.sensores_odometry_monitor.enable_monitor()
+
+def habilitar_monitor():
+  print('EL MADC ESTA CONECTADOOOOO')
+  pestana_config_serial.cmd_port
   pestana_tests.conection_state_label.config(text='¡CONECTADO!', background=paleta_color[2])
   pestana_tests.conextion_test_btns.Btn_UP.config(state='disable')
   pestana_tests.sensores_tank_selec_btns.enabled_btns()
@@ -702,7 +1138,77 @@ def doConection_v2():
 
   pestana_monitor.enabled()
 
+  if pestana_config_serial.cmd_port is None or not pestana_config_serial.cmd_port.is_open:
+      return
+  else:
+    pestana_config_serial.cmd_port.write('Check_Modules\n'.encode())
+
+pestana_config_serial.set_conction_callback(habilitar_monitor)
+
 pestana_tests.conextion_test_btns.Btn_UP.config(command= doConection_v2)
 
+def check_modules():
+  pestana_config_serial.cmd_port.write('Check_Modules\n'.encode())
+  window.after(1000, doBluetooth_petitios)
+
+pestana_tests.conextion_test_btns.Btn_DOWN.config(command= pestana_tests.check_modules_conection)
+
+def set_fuctions_to_buttons(event):
+  pestana = panel_pestanas.index('current')
+  pestana_config_serial.reset_button_status()
+  #print(pestana)
+  if pestana == 0:                  # INITIAL TAB
+    pestana_inicial.check_buttons()
+    
+    pestana_config_serial.after_cancel(pestana_config_serial.id_check_buttos)
+    pestana_config.after_cancel(pestana_config.id_check_buttos)
+    pestana_tests.after_cancel(pestana_tests.id_check_buttos)
+    pestana_monitor.after_cancel(pestana_monitor.id_check_buttos)
+  elif pestana == 1:         # SERIAL CONFIG TAB
+    pestana_config_serial.check_buttons()
+
+    pestana_inicial.after_cancel(pestana_inicial.id_check_buttos)
+    pestana_config.after_cancel(pestana_config.id_check_buttos)
+    pestana_tests.after_cancel(pestana_tests.id_check_buttos)
+    pestana_monitor.after_cancel(pestana_monitor.id_check_buttos)
+  elif pestana == 2:         # SEED CONGIF TAB
+    pestana_config.check_buttons()
+
+    pestana_inicial.after_cancel(pestana_inicial.id_check_buttos)
+    pestana_config_serial.after_cancel(pestana_config_serial.id_check_buttos)
+    pestana_tests.after_cancel(pestana_tests.id_check_buttos)
+    pestana_monitor.after_cancel(pestana_monitor.id_check_buttos)
+  elif pestana == 3:         # TEST TAB
+    pestana_tests.check_buttons()
+
+    pestana_inicial.after_cancel(pestana_inicial.id_check_buttos)
+    pestana_config_serial.after_cancel(pestana_config_serial.id_check_buttos)
+    pestana_config.after_cancel(pestana_config.id_check_buttos)
+    pestana_monitor.after_cancel(pestana_monitor.id_check_buttos)
+  elif pestana == 4:         # MONITOR TAB
+    pestana_monitor.check_buttons()
+
+    pestana_inicial.after_cancel(pestana_inicial.id_check_buttos)
+    pestana_config_serial.after_cancel(pestana_config_serial.id_check_buttos)
+    pestana_config.after_cancel(pestana_config.id_check_buttos)
+    pestana_tests.after_cancel(pestana_tests.id_check_buttos)
+
+panel_pestanas.bind('<<NotebookTabChanged>>',set_fuctions_to_buttons)
+
+def doBluetooth_petitios():
+  if pestana_config_serial.cmd_port is None or not pestana_config_serial.cmd_port.is_open:
+      return
+  else:
+    pestana_config_serial.cmd_port.write('read_Level_Tank1\n'.encode())
+  
+  window.after(500,doBluetooth_petitios)
+
+pestana_inicial.check_buttons()
+pestana_config_serial.check_buttons()
+pestana_config.check_buttons()
+pestana_tests.check_buttons()
+pestana_monitor.check_buttons()
 #----------------------- Ciclo principal donde corre el programa de la interfaz -------------------------------------
 window.mainloop() #este metodo esta en ejecuncion hasta que se cierre la ventana creada
+
+#pestana_config_serial.disconectSerial() #cierra el puesto serial al momento de cerrar el programa

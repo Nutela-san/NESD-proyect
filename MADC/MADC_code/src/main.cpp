@@ -44,6 +44,7 @@ void MADC_conection_callback(){
 }
 
 void modules_status_conection(){
+  can_serch_modules();
   port_bt.print("conetion_status = ");
   for(uint8_t i = 0 ; i<7; i++){
     (conetion_list[i])? port_bt.print("true,"): port_bt.print("false,");
@@ -55,7 +56,7 @@ void modules_status_conection(){
 void read_tank_level(){
   tank1_level = constrain(tank1_level,5,37);
   uint8_t level_porcent = map(tank1_level,5,37,100,0);
-  port_bt.print("TANK1,");
+  port_bt.print("TANK1 = ");
   port_bt.println(level_porcent);
 }
 
@@ -134,6 +135,7 @@ void setup() {
   can_serch_modules();
   //can_serch_modules(&port_bt);
   last_t = millis();
+  
 }
 
 void loop() { 
