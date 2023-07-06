@@ -48,7 +48,6 @@ void setup() {
   prev_color = (int)led_color;
   set_lights_intensity(50);
 
-  last_t = millis();
   bool wait_main_hmi = true;
   char msj;
   while(wait_main_hmi){
@@ -67,7 +66,9 @@ void setup() {
   }
   Serial.println("HMI CONECTED");
   port_bt.println("MADC_conect");
+  
   led_color = 0;
+  last_t = millis();
 }
 
 void loop() {

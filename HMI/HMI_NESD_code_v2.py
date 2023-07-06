@@ -208,7 +208,7 @@ class Odometry_monitor(ttk.Frame):
 
     font_size = 30 #self.grid_info()
     self.speed_title = ttk.Label(self, text= 'Velocidad de Siembra', font= f'Arial {font_size} bold' , anchor='center' )
-    self.speed_unit  = ttk.Label(self, text= 'Km/hr', font= f'Arial {font_size}' , anchor='center' )
+    self.speed_unit  = ttk.Label(self, text= 'm/s', font= f'Arial {font_size}' , anchor='center' )
     self.speed_var_text = ttk.Label(self, text= f'{self.odometry_data[0].get()}',  font= f'Arial {font_size}' , 
                                     anchor='center' , relief='groove')
 
@@ -413,7 +413,7 @@ class initial_tab(ttk.Frame):
     self.id_check_buttos =  self.after(100, self.check_buttons)
 
 class config_serial_tab(ttk.Frame):
-  def __init__(self, parent, size, tank_parameters, odometry_parameters):
+  def __init__(self, parent, size, tank_parameters, odometry_parameters, odometry_convertion):
     super().__init__(parent)
     super().configure(relief= 'groove', border= 5)#añade un borde para ver los limites
     self.main_size = size
@@ -421,8 +421,18 @@ class config_serial_tab(ttk.Frame):
     self.conected = False
     self.tank_parameters = tank_parameters
     self.odometry_parameters = odometry_parameters
+    self.odometry_convertion = odometry_convertion
 
-    self.modules_status_conection = [] # estatus de conexion de modulos.
+    self.modules_status_conection = [ False,  #0 OK BTN     # lista para con el status de botones presionados.
+                                      False,  #1 BACK BTN
+                                      False,  #2 UP BTN
+                                      False,  #3 DOWN BTN
+                                      False,  #4 R_UP  perilla 
+                                      False,  #5 R_DOWN perilla 
+                                      False,  #6 TAB 1
+                                      False,  #7 TAB 2
+                                      False] # estatus de conexion de modulos.
+    
     self.available_serial_ports = [] #lista de puertos disponibles
     self.conexion_test_callback = ()
     self.status_btns_list = [ False,  #0 OK BTN     # lista para con el status de botones presionados.
@@ -510,45 +520,52 @@ class config_serial_tab(ttk.Frame):
       return
     try:
       if self.cmd_port.in_waiting > 0:
-        dato = self.cmd_port.readline().strip().decode()
-        self.check_command(dato)
-        if not dato.startswith('TANK1'):
+        dato = self.cmd_port.readline().decode().strip()
+        self.check_command(text=dato)
+        if not dato.startswith('TANK1') and not dato.startswith('odometry'):
           self.serial_command_log_text.insert(tk.END, dato + "\n")
     except serial.SerialException:
       self.serial_command_log_text.insert(tk.END, "Error al leer el puerto serial\n")
       
-    self.id_task_readSerial = self.after(50, self.read_serial_port)
+    self.id_task_readSerial = self.after(20, self.read_serial_port)
   
   def check_command(self, text):
     if '=' in text:
       command,value_s = text.split('=')
-      command.strip()
-      value_s.strip()
+
       if command.startswith('conetion_status'):
+        print('Se recibio comando de CONECTION_STATUS')
         valores = value_s.split(',')
+        status = [valor.strip() for valor in valores]
+
+        for i in range(len(valores)):
+          if status[i]=='true':
+              self.modules_status_conection[i] = True
+          else:
+              self.modules_status_conection[i] = False
         #self.modules_status_conection = ( bool(valores[0]),bool(valores[1]), bool(valores[2]), bool(valores[3]),
         #                                  bool(valores[4]),bool(valores[5]), bool(valores[6]), bool(valores[7])) 
-        self.modules_status_conection = [bool(valor) for valor in valores]
+        #self.modules_status_conection = [bool(valor) for valor in valores]
+        print('Se actualizo el estatus de conexion a:')
+        print(self.modules_status_conection)#self.modules_status_conection)
       elif  command.startswith('TANK1'):  
         self.tank_parameters[0].set(int(value_s))
         print(f'nivel de tanque = {int(value_s)}')
       elif  command.startswith('SeedOuts_t1'):
-        valores = value_s.split(',')
-        self.tank_parameters[1].set(int(valores[0]))
-        self.tank_parameters[2].set(int(valores[1]))
+        Sout1,Sout2 = value_s.split(',')
+        self.tank_parameters[1].set(int(Sout1))
+        self.tank_parameters[2].set(int(Sout2))
       elif  command.startswith('odometry'):
         valores = value_s.split(',')
-        self.odometry_parameters.set(float(valores[1]))
-        self.odometry_parameters.set(int(valores[0]))
+        self.odometry_parameters[0].set(round(float(valores[1].strip())*self.odometry_convertion,2))
+        self.odometry_parameters[1].set(round(float(valores[0].strip())*self.odometry_convertion,2))
+        print(f'odometrya de tanque = {float(valores[0])},{float(valores[1])}')
     else:
-
       command = text
       if command == 'MADC_conection_OK':
         self.conexion_test_callback()
-
       elif command == 'OK':
         self.status_btns_list[0] = True
-
       elif command == 'BACK':
         self.status_btns_list[1] = True
       elif command == 'UP':
@@ -588,10 +605,6 @@ class config_serial_tab(ttk.Frame):
         self.disconectSerial()
       else:
         self.doSerialConection()
-    elif self.read_button_status(button_num=4): #4 R_UP  perilla 
-      pass
-    elif self.read_button_status(button_num=5): #5 R_DOWN perilla
-      pass
     elif self.read_button_status(button_num=6): #6 TAB 1
       self.parent.select(0)
     elif self.read_button_status(button_num=7): #7 TAB 2
@@ -696,6 +709,8 @@ class test_tab(ttk.Frame):
     super().__init__(parent)
     self.parent = parent
     self.serial_tab = tab_serial_config
+    self.id_check_buttos = None
+    self.id_check_modules = None
 
     self.menu_state = 0 # 0= seleccion de test , 1=test de conexion, 2=test de sensores ,3=TOLVA1
     self.button_selec_state = 0 # 0= no seleccion , 1 = UP OPTION, 2=DOWN OPTION
@@ -836,7 +851,7 @@ class test_tab(ttk.Frame):
     self.conection_setBack_btns.config_fuctions(Btn_OK_func= lambda: print('ocultar boton'),
                                                 Btn_BACK_func= self.change2SelectTestTab)
     self.conextion_test_btns.config_fuctions( Btn_UP_func=self.doTestConection,
-                                              Btn_DOWN_func= lambda: print('Config. Funcion'))
+                                              Btn_DOWN_func= self.check_modules_conection)
 
   def change2SensorTestTab(self):
     self.selection_test_tab.grid_forget()
@@ -888,11 +903,13 @@ class test_tab(ttk.Frame):
     self.serial_tab.cmd_port.write('H'.encode())
 
   def check_modules_conection(self):
+    print('peticion de chequeo de modulos')
     self.serial_tab.cmd_port.write('Check_Modules\n'.encode())
-    self.update_list_modules()
-    self.id_check_modules = self.parent.after(1000, self.check_modules_conection)
+    #self.update_list_modules()
+    print('Se realizo al peticion de estado de conexion')
+    #self.id_check_modules = self.after(5000, self.check_modules_conection)
     
-  def check_buttons(self):
+  def check_buttons(self):  
     if self.serial_tab.read_button_status(button_num=0): #0 OK BTN
       if self.menu_state == 1: # Menu de test de conexion
         self.change2SelectTestTab()
@@ -1067,19 +1084,22 @@ class monitor_tab(ttk.Frame):
 level1 = tk.IntVar(value=0)
 SeedOut_t1 = (tk.IntVar(value=0),tk.IntVar(value=0))
 
-tractor_odometry = (tk.DoubleVar(value=0),tk.IntVar(value=0))#(tk.IntVar(value=0), tk.IntVar(value=10))
+tractor_odometry = (tk.DoubleVar(value=0),tk.DoubleVar(value=0))#(tk.IntVar(value=0), tk.IntVar(value=10))
 tolva_variables = (level1,SeedOut_t1[0],SeedOut_t1[1])
 
 #----------------------- widgets -------------------------------------
 panel_pestanas = ttk.Notebook(window, width= int(screen_w), height=int(screen_h*0.99))
 
 pestana_config_serial = config_serial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
-                                          tank_parameters= tolva_variables, odometry_parameters= tractor_odometry)
+                                          tank_parameters= tolva_variables,
+                                          odometry_parameters= tractor_odometry,
+                                          odometry_convertion= float(1/10))
 
 pestana_inicial = initial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
                               tab_serial_config= pestana_config_serial)
 
-pestana_config = config_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)), tab_serial_config= pestana_config_serial)
+pestana_config = config_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
+                            tab_serial_config= pestana_config_serial)
 
 pestana_tests = test_tab( panel_pestanas,size=(int(screen_w),int(screen_h*0.99)),
                           tank_parameters= tolva_variables, odometry_parameters= tractor_odometry,
@@ -1116,19 +1136,10 @@ window.bind('<KeyPress-l>', lambda event: tractor_odometry[0].set(tractor_odomet
 
 pestana_inicial.INICIAR_btn.config(command= lambda: panel_pestanas.select(1))
 
-def doConection_v2():
-  pestana_config_serial.cmd_port.write('H'.encode())
 
-  #pestana_tests.conection_state_label.config(text='¡CONECTADO!', background=paleta_color[2])
-  #pestana_tests.conextion_test_btns.Btn_UP.config(state='disable')
-  #pestana_tests.sensores_tank_selec_btns.enabled_btns()
-  #pestana_tests.sensores_set_seed_dispence_btns.enable_parameters()
-  #pestana_tests.sensores_tank_monitor.enable_monitor()
-  #pestana_tests.sensores_odometry_monitor.enable_monitor()
 
 def habilitar_monitor():
   print('EL MADC ESTA CONECTADOOOOO')
-  pestana_config_serial.cmd_port
   pestana_tests.conection_state_label.config(text='¡CONECTADO!', background=paleta_color[2])
   pestana_tests.conextion_test_btns.Btn_UP.config(state='disable')
   pestana_tests.sensores_tank_selec_btns.enabled_btns()
@@ -1141,17 +1152,13 @@ def habilitar_monitor():
   if pestana_config_serial.cmd_port is None or not pestana_config_serial.cmd_port.is_open:
       return
   else:
-    pestana_config_serial.cmd_port.write('Check_Modules\n'.encode())
+    #doBluetooth_petitios()#pass#pestana_tests.check_modules_conection()
+    #pestana_tests.check_modules_conection()
+    doBluetooth_petitios()
 
 pestana_config_serial.set_conction_callback(habilitar_monitor)
 
-pestana_tests.conextion_test_btns.Btn_UP.config(command= doConection_v2)
 
-def check_modules():
-  pestana_config_serial.cmd_port.write('Check_Modules\n'.encode())
-  window.after(1000, doBluetooth_petitios)
-
-pestana_tests.conextion_test_btns.Btn_DOWN.config(command= pestana_tests.check_modules_conection)
 
 def set_fuctions_to_buttons(event):
   pestana = panel_pestanas.index('current')
@@ -1195,13 +1202,23 @@ def set_fuctions_to_buttons(event):
 
 panel_pestanas.bind('<<NotebookTabChanged>>',set_fuctions_to_buttons)
 
+num_petition = 0
 def doBluetooth_petitios():
+  global num_petition
   if pestana_config_serial.cmd_port is None or not pestana_config_serial.cmd_port.is_open:
       return
   else:
-    pestana_config_serial.cmd_port.write('read_Level_Tank1\n'.encode())
-  
-  window.after(500,doBluetooth_petitios)
+    if num_petition == 0:
+      pestana_config_serial.cmd_port.write('read_Level_Tank1\n'.encode())
+      num_petition += 1
+    elif num_petition == 1:
+      pestana_config_serial.cmd_port.write('read_Odometry\n'.encode())
+      num_petition += 1
+    elif num_petition == 2:
+      #pestana_tests.check_modules_conection()
+      num_petition = 0
+
+  window.after(165,doBluetooth_petitios)
 
 pestana_inicial.check_buttons()
 pestana_config_serial.check_buttons()

@@ -21,7 +21,7 @@ enum NESD_device_type{
   SLAVE_MED3
 };
 
-ulong timeout = 250;
+ulong timeout = 100;
 ulong last_t_update = 0;
 ulong update_periodo = 20;
 uint8_t petition_state = 0;
@@ -323,28 +323,28 @@ void can_update(){
   if((millis() - last_t_update) >= update_periodo){
     switch(petition_state){
       case 0:{
-        can_petition_Tank1_Level();
+        if(conetion_list[0]) can_petition_Tank1_Level();
         petition_state ++;
         break;
       }
       case 1:{
-        can_petition_MEO1_Odometry_pos();
+        if(conetion_list[3]) can_petition_MEO1_Odometry_pos();
         petition_state++;
         break;
       }
       case 2:{
-        can_petition_MEO1_Odometry_vel();
+        if(conetion_list[3]) can_petition_MEO1_Odometry_vel();
         petition_state++;
         break;
       }
       case 3:{
-        //can_petition_MED1_seedout1();
+        //if(conetion_list[5]) can_petition_MED1_seedout1();
         petition_state++;
         break;
       }
       case 4:{
-         //can_petition_MED1_seedout2();
-        petition_state =0;
+         //if(conetion_list[5]) can_petition_MED1_seedout2();
+        petition_state = 0;
         break;
       }
       default:{

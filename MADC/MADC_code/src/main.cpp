@@ -45,7 +45,7 @@ void MADC_conection_callback(){
 
 void modules_status_conection(){
   can_serch_modules();
-  port_bt.print("conetion_status = ");
+  port_bt.print("conetion_status=");
   for(uint8_t i = 0 ; i<7; i++){
     (conetion_list[i])? port_bt.print("true,"): port_bt.print("false,");
   }
