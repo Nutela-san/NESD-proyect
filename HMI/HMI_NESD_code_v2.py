@@ -1090,10 +1090,14 @@ tolva_variables = (level1,SeedOut_t1[0],SeedOut_t1[1])
 #----------------------- widgets -------------------------------------
 panel_pestanas = ttk.Notebook(window, width= int(screen_w), height=int(screen_h*0.99))
 
+Dw = 0.50 #metros
+Er = 8 #ppr del encoder
+Gr = 1.25
+
 pestana_config_serial = config_serial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
                                           tank_parameters= tolva_variables,
                                           odometry_parameters= tractor_odometry,
-                                          odometry_convertion= float(1/10))
+                                          odometry_convertion= float((3.1416*Dw)/(Gr*Er)))
 
 pestana_inicial = initial_tab(panel_pestanas, size=(int(screen_w),int(screen_h*0.99)),
                               tab_serial_config= pestana_config_serial)

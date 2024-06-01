@@ -39,7 +39,7 @@ void cmd_config(){
 
 void setup() {    
   IL_config();
-  perifericos_config();
+  //perifericos_config();
   cmd_config();
 
   set_lights_intensity(200);
@@ -58,7 +58,7 @@ void setup() {
         set_lights_color(configured_color);
       }
     }
-    update_buttons(&Serial);
+    //update_buttons(&Serial);
   }
   port_bt.connect("MADC"); //conectando al MADC
   while(!port_bt.connected(5000)){
@@ -97,6 +97,6 @@ void loop() {
   }
 
   ligths_update();
-  update_buttons(&Serial);
+  //update_buttons(&Serial);
 }
 

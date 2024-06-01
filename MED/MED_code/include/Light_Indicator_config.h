@@ -1,16 +1,15 @@
 #include <Arduino.h>
 #include <NeoPixelBus.h>
-// Se hace uso del actronimo IL (Indication_Lights)
-//---------- Definiciones de pines ----------
 
-const uint8_t IL_pin =12, num_lights = 3;
+const uint8_t IL_pin = A0, num_lights = 1;
 
-float led_color = 0;
+float led_color = 3;
 int prev_color = 1;
-float intensidad = 128;
-uint8_t prev_i = 128;
+float intensidad = 15;
+uint8_t prev_i = 15;
 
-NeoPixelBus<NeoGrbwFeature,Neo800KbpsMethod> I_L(num_lights,IL_pin);
+NeoPixelBus<NeoGrbFeature, Neo400KbpsMethod> I_L(num_lights, IL_pin);
+
 #define colorSaturation prev_i
 
 RgbColor error_color(colorSaturation, 0, 0);
@@ -46,16 +45,19 @@ void set_lights_intensity(uint8_t i){
 }
 
 void ligths_update(){
-  if((uint8_t)intensidad != prev_i){
+  if((uint8_t)intensidad != prev_i || (led_color!= prev_color)){
+    intensidad = constrain(intensidad,0.0,255.0);
+    led_color = constrain(led_color,0,4);
+
     prev_i = (uint8_t)intensidad;
+    prev_color = led_color;
     set_lights_intensity(prev_i);
     set_lights_color(color[prev_color]);
-    
   }
 }
 
-void IL_config(){
+void lights_config(){
   I_L.Begin();
   I_L.Show();
+  delay(100);
 }
-

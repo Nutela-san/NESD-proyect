@@ -23,7 +23,7 @@ enum NESD_device_type{
 
 ulong timeout = 100;
 ulong last_t_update = 0;
-ulong update_periodo = 20;
+ulong update_periodo = 100;
 uint8_t petition_state = 0;
 
 union distance{
@@ -38,6 +38,13 @@ union velocity{
 struct Odometry {
   distance distancia;
   velocity velocidad;
+};
+
+struct Tank_parameters{
+  uint8_t speed_seted_dosifier[2];
+  uint8_t seed_speed_readed[2];
+  uint8_t seeds_per_meter_setpoint;
+  uint8_t level_of_seed;
 };
 
 bool conetion_list[8] = {false,false,false,false,false,false,false,false};
@@ -290,30 +297,68 @@ void can_listen_MEO1_Odometry(Stream *port , Odometry *odo_data){
   }
 }
 
-void can_listen(Stream *port, uint8_t *level, Odometry *odo_data){
+void can_petition_MED1_SeedSpeedOut(){
+  msg_request.can_id = ID_MED[0]; 
+  msg_request.can_dlc = 1;
+  msg_request.data[0] = NESD_commands::read_variable;
+
+  can_port.sendMessage(&msg_request);
+  delay(10);
+}
+
+void can_petition_MED1_setDosifierSpeed(uint8_t D1_speed, uint8_t D2_speed){
+  msg_request.can_id = ID_MED[0]; 
+  msg_request.can_dlc = 3;
+  msg_request.data[0] = NESD_commands::set_variable;
+  msg_request.data[1] = D1_speed;
+  msg_request.data[2] = D2_speed;
+
+  can_port.sendMessage(&msg_request);
+  delay(10);
+}
+
+void can_listen(Stream *port, uint8_t *level, Odometry *odo_data , Tank_parameters *MED_data, bool debug_mode = true){
   if(can_port.readMessage(&msg_anser) == MCP2515::ERROR_OK &&
       msg_anser.can_id == ID_MASTER_CAN){
         if( msg_anser.data[0] == NESD_commands::read_variable && 
             msg_anser.data[1] == ID_MMNS[0] && msg_anser.can_dlc == 3){
           *level = (uint8_t)msg_anser.data[2];
-          port->print("Tank 1 Level = ");
-          port->println(*level);
+          if(debug_mode){
+            port->print("Tank 1 Level = ");
+            port->println(*level);
+          }
         }
         else if(msg_anser.data[0] == NESD_commands::read_variable && 
                 msg_anser.data[1] == ID_MEO[0] && msg_anser.can_dlc == 6){
           for(uint8_t i = 0; i< sizeof(float); i++){
             odo_data->distancia.distance_bytes[i] = msg_anser.data[i+2];
           }
-          port->print("Poscion de encoder = ");
-          port->println(odo_data->distancia.distance_float);
+          if(debug_mode){
+            port->print("Poscion de encoder = ");
+            port->println(odo_data->distancia.distance_float);
+          }
         }
         else if(msg_anser.data[0] == NESD_commands::read_second_variable && 
                 msg_anser.data[1] == ID_MEO[0] && msg_anser.can_dlc == 6){
           for(uint8_t i = 0; i< sizeof(float); i++){
             odo_data->velocidad.velocity_bytes[i] = msg_anser.data[i+2];
           }
-          port->print("Poscion de encoder = ");
-          port->println(odo_data->velocidad.velocity_float);
+          if(debug_mode){
+            port->print("Poscion de encoder = ");
+            port->println(odo_data->velocidad.velocity_float);
+          }
+        }
+        else if(msg_anser.data[0] == NESD_commands::read_variable && 
+                msg_anser.data[1] == ID_MED[0] && msg_anser.can_dlc == 4){
+          MED_data->seed_speed_readed[0] = msg_anser.data[2];
+          MED_data->seed_speed_readed[1] = msg_anser.data[3];
+          if(debug_mode){
+            port->print("SeedOuts = [");
+            port->print((int)MED_data->seed_speed_readed[0]);
+            port->print(",");
+            port->print((int)MED_data->seed_speed_readed[1]);
+            port->println("]");
+          }
         }
 
       }
@@ -338,7 +383,7 @@ void can_update(){
         break;
       }
       case 3:{
-        //if(conetion_list[5]) can_petition_MED1_seedout1();
+        if(conetion_list[5]) can_petition_MED1_SeedSpeedOut();
         petition_state++;
         break;
       }
@@ -351,7 +396,7 @@ void can_update(){
         break; //nada
       }
     }
-    update_periodo = millis();
+    last_t_update = millis(); // cambie esta asiganacion a last_t_update en lugar de update_periodo
   }
 }
 
